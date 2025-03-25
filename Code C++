@@ -1,0 +1,115 @@
+#include <iostream>
+#include <vector>
+#include <fstream>
+#include <cstring>
+#include <openssl/aes.h>
+#include <openssl/rand.h>
+
+// Cấu trúc lưu trữ thông tin đăng nhập
+struct PasswordEntry {
+    std::string website;
+    std::string username;
+    std::string encryptedPassword;
+};
+
+// Hàm mã hóa mật khẩu bằng AES
+std::string encryptPassword(const std::string& password, unsigned char* key) {
+    AES_KEY encryptKey;
+    AES_set_encrypt_key(key, 128, &encryptKey);
+    
+    unsigned char iv[AES_BLOCK_SIZE];
+    RAND_bytes(iv, AES_BLOCK_SIZE); // Sinh IV ngẫu nhiên
+    
+    std::string encrypted(password.size(), '\0');
+    AES_encrypt((unsigned char*)password.c_str(), (unsigned char*)&encrypted[0], &encryptKey);
+    
+    return std::string((char*)iv, AES_BLOCK_SIZE) + encrypted;
+}
+
+// Hàm giải mã mật khẩu
+std::string decryptPassword(const std::string& encrypted, unsigned char* key) {
+    AES_KEY decryptKey;
+    AES_set_decrypt_key(key, 128, &decryptKey);
+    
+    unsigned char iv[AES_BLOCK_SIZE];
+    memcpy(iv, encrypted.data(), AES_BLOCK_SIZE);
+    
+    std::string decrypted(encrypted.size() - AES_BLOCK_SIZE, '\0');
+    AES_decrypt((unsigned char*)encrypted.data() + AES_BLOCK_SIZE, (unsigned char*)&decrypted[0], &decryptKey);
+    
+    return decrypted;
+}
+
+// Hàm thêm mật khẩu vào danh sách
+void addPassword(std::vector<PasswordEntry>& entries, unsigned char* key) {
+    std::string website, username, password;
+    std::cout << "Nhập trang web: ";
+    std::cin >> website;
+    std::cout << "Nhập username: ";
+    std::cin >> username;
+    std::cout << "Nhập mật khẩu: ";
+    std::cin >> password;
+    
+    std::string encryptedPassword = encryptPassword(password, key);
+    entries.push_back({website, username, encryptedPassword});
+}
+
+// Hàm tìm kiếm mật khẩu
+void findPassword(const std::vector<PasswordEntry>& entries, unsigned char* key) {
+    std::string website;
+    std::cout << "Nhập trang web: ";
+    std::cin >> website;
+    
+    for (const auto& entry : entries) {
+        if (entry.website == website) {
+            std::cout << "Username: " << entry.username << std::endl;
+            std::cout << "Password: " << decryptPassword(entry.encryptedPassword, key) << std::endl;
+            return;
+        }
+    }
+    std::cout << "Không tìm thấy mật khẩu!" << std::endl;
+}
+
+// Hàm lưu danh sách mật khẩu vào file
+void saveToFile(const std::vector<PasswordEntry>& entries) {
+    std::ofstream file("passwords.txt");
+    for (const auto& entry : entries) {
+        file << entry.website << " " << entry.username << " " << entry.encryptedPassword << "\n";
+    }
+    file.close();
+}
+
+// Hàm đọc danh sách mật khẩu từ file
+void loadFromFile(std::vector<PasswordEntry>& entries) {
+    std::ifstream file("passwords.txt");
+    std::string website, username, encryptedPassword;
+    
+    while (file >> website >> username >> encryptedPassword) {
+        entries.push_back({website, username, encryptedPassword});
+    }
+    file.close();
+}
+
+// Menu chính
+int main() {
+    std::vector<PasswordEntry> entries;
+    unsigned char key[16] = "0123456789abcdef"; // Khóa bí mật
+    
+    loadFromFile(entries);
+    
+    while (true) {
+        std::cout << "\n1. Thêm mật khẩu\n2. Tìm mật khẩu\n3. Thoát\nChọn: ";
+        int choice;
+        std::cin >> choice;
+        
+        if (choice == 1) {
+            addPassword(entries, key);
+            saveToFile(entries);
+        } else if (choice == 2) {
+            findPassword(entries, key);
+        } else {
+            break;
+        }
+    }
+    return 0;
+}
