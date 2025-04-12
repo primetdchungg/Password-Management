@@ -1,5 +1,7 @@
 import tkinter as tk
+from tkinter import messagebox
 from tkinter import ttk, messagebox
+from ttkthemes import ThemedTk
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -97,6 +99,14 @@ def delete_password(website):
         return
     del passwords[website]
     save_passwords(passwords)
+    
+def delete_data():
+    if messagebox.askyesno("Xóa dữ liệu", "Bạn có chắc chắn muốn xóa tất cả dữ liệu?"):
+        try:
+            os.remove("passwords.json")
+            messagebox.showinfo("Thông báo", "Dữ liệu đã được xóa.")
+        except FileNotFoundError:
+            messagebox.showerror("Lỗi", "Không tìm thấy tệp passwords.json.")
 
 def authenticate(master_password, stored_key, stored_salt):
     derived_key, _ = generate_key(master_password, stored_salt)
@@ -120,6 +130,7 @@ def get_key(master_password):
 def add_password_window(root, key):
     add_window = tk.Toplevel(root)
     add_window.title("Thêm mật khẩu")
+    add_window.configure(bg="#e0f2f7")
 
     tk.Label(add_window, text="Trang web/ứng dụng:").grid(row=0, column=0, padx=5, pady=5)
     website_entry = tk.Entry(add_window)
@@ -146,11 +157,17 @@ def add_password_window(root, key):
 def view_passwords_window(root, key):
     view_window = tk.Toplevel(root)
     view_window.title("Xem mật khẩu")
+    view_window.configure(bg="#e0f2f7")
 
     password_list = view_passwords(key)
     if not password_list:
-        tk.Label(view_window, text="Chưa có mật khẩu nào được lưu.", padx=10, pady=10).pack()
+        tk.Label(view_window, text="Chưa có mật khẩu nào được lưu.", padx=10, pady=10, bg="#e0f2f7").pack()
     else:
+        style = ttk.Style()
+        style.configure("Treeview.Heading", font=("Arial", 12, ))
+        style.configure("Treeview", font=("Arial", 11), rowheight=30)
+        style.configure("TButton", padding=(10, 5)) # Thêm padding cho nút "Đóng"
+
         tree = ttk.Treeview(view_window, columns=("website", "username", "password"), show="headings")
         tree.heading("website", text="Trang web")
         tree.heading("username", text="Người dùng")
@@ -160,17 +177,19 @@ def view_passwords_window(root, key):
         for website, username, password in password_list:
             tree.insert("", tk.END, values=(website, username, password))
 
-    ttk.Button(view_window, text="Đóng", command=view_window.destroy, padx=10, pady=5).pack()
+    ttk.Button(view_window, text="Đóng", command=view_window.destroy, style="TButton").pack() # Sử dụng style TButton
+
 
 def edit_password_window(root, key):
     edit_window = tk.Toplevel(root)
     edit_window.title("Sửa mật khẩu")
+    edit_window.configure(bg="#e0f2f7")
 
     tk.Label(edit_window, text="Trang web/ứng dụng:").grid(row=0, column=0, padx=5, pady=5)
     website_entry = tk.Entry(edit_window)
     website_entry.grid(row=0, column=1, padx=5, pady=5)
 
-    tk.Label(edit_window, text="Tên người dùng mới (để trống để giữ nguyên):").grid(row=1, column=0, padx=5, pady=5)
+    tk.Label(edit_window, text="Tên người dùng mới:").grid(row=1, column=0, padx=5, pady=5)
     username_entry = tk.Entry(edit_window)
     username_entry.grid(row=1, column=1, padx=5, pady=5)
 
@@ -191,6 +210,7 @@ def edit_password_window(root, key):
 def delete_password_window(root):
     delete_window = tk.Toplevel(root)
     delete_window.title("Xóa mật khẩu")
+    delete_window.configure(bg="#e0f2f7")
 
     tk.Label(delete_window, text="Trang web/ứng dụng:").grid(row=0, column=0, padx=5, pady=5)
     website_entry = tk.Entry(delete_window)
@@ -206,11 +226,13 @@ def delete_password_window(root):
 
 def main():
     root = tk.Tk()
-    root.title("Quản lý mật khẩu")
+    root.title("Ứng dụng quản lý mật khẩu")
     root.geometry("400x300")
+    root.configure(bg="#ADD8E6")
 
     style = ttk.Style()
-    style.configure("TButton", padding=10, font=("Arial", 12))
+    style.configure("TButton", padding=9, font=("Arial", 12))  # Style cho các nút 
+    style.configure("Red.TButton", padding=10, font=("Arial", 12), background="#FF0000")  # Style cho nút "Thoát"
 
     master_password = getpass.getpass("Nhập mật khẩu chính: ")
     key = get_key(master_password)
@@ -218,242 +240,12 @@ def main():
         messagebox.showerror("Lỗi", "Mật khẩu chính không đúng.")
         return
 
-    ttk.Button(root, text="Thêm mật khẩu", command=lambda: add_password_window(root, key)).pack(fill="x", pady=5)
-    ttk.Button(root, text="Xem mật khẩu", command=lambda: view_passwords_window(root, key)).pack(fill="x", pady=5)
-    ttk.Button(root, text="Sửa mật khẩu", command=lambda: edit_password_window(root, key)).pack(fill="x", pady=5)
-    ttk.Button(root, text="Xóa mật khẩu", command=lambda: delete_password_window(root)).pack(fill="x", pady=5)
-    ttk.Button(root, text="Thoát", command=root.destroy).pack(fill="x", pady=5)
-
-    root.mainloop()
-
-if __name__ == "__main__":
-    import tkinter as tk  
-    main()
-from tkinter import ttk, messagebox
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-import base64
-import os
-import json
-import getpass
-import keyring
-
-def generate_key(master_password, salt=None):
-    if salt is None:
-        salt = os.urandom(16)
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=100000,
-    )
-    key = base64.urlsafe_b64encode(kdf.derive(master_password.encode()))
-    return key, salt
-
-def encrypt_data(data, key):
-    f = Fernet(key)
-    encrypted_data = f.encrypt(data.encode())
-    return encrypted_data.decode()
-
-def decrypt_data(encrypted_data, key):
-    try:
-        f = Fernet(key)
-        decrypted_data = f.decrypt(encrypted_data.encode()).decode()
-        return decrypted_data
-    except Exception as e:
-        messagebox.showerror("Lỗi", f"Lỗi giải mã: {e}")
-        return None
-
-def load_passwords(filepath="passwords.json"):
-    if os.path.exists(filepath):
-        with open(filepath, "r") as f:
-            try:
-                data = json.load(f)
-                return data
-            except json.JSONDecodeError:
-                messagebox.showerror("Lỗi", "Tệp passwords.json bị hỏng.")
-                return {}
-    else:
-        return {}
-
-def save_passwords(passwords, filepath="passwords.json"):
-    with open(filepath, "w") as f:
-        json.dump(passwords, f)
-
-def add_password(website, username, password, key):
-    encrypted_username = encrypt_data(username, key)
-    encrypted_password = encrypt_data(password, key)
-    data = {"username": encrypted_username, "password": encrypted_password}
-    passwords = load_passwords()
-    passwords[website] = json.dumps(data)
-    save_passwords(passwords)
-
-def view_passwords(key):
-    passwords = load_passwords()
-    if not passwords:
-        messagebox.showinfo("Thông báo", "Chưa có mật khẩu nào được lưu.")
-        return []
-    else:
-        password_list = []
-        for website, data in passwords.items():
-            try:
-                data = json.loads(data)
-                username = decrypt_data(data["username"], key)
-                password = decrypt_data(data["password"], key)
-                if username and password:
-                    password_list.append((website, username, password))
-                else:
-                    messagebox.showerror("Lỗi", f"Không thể giải mã mật khẩu cho {website}.")
-            except (json.JSONDecodeError, KeyError) as e:
-                messagebox.showerror("Lỗi", f"Dữ liệu mật khẩu cho {website} bị hỏng ({e}).")
-        return password_list
-
-def edit_password(website, new_username, new_password, key):
-    passwords = load_passwords()
-    if website not in passwords:
-        messagebox.showerror("Lỗi", "Không tìm thấy trang web/ứng dụng.")
-        return
-    encrypted_username = encrypt_data(new_username, key)
-    encrypted_password = encrypt_data(new_password, key)
-    data = {"username": encrypted_username, "password": encrypted_password}
-    passwords[website] = json.dumps(data)
-    save_passwords(passwords)
-
-def delete_password(website):
-    passwords = load_passwords()
-    if website not in passwords:
-        messagebox.showerror("Lỗi", "Không tìm thấy trang web/ứng dụng.")
-        return
-    del passwords[website]
-    save_passwords(passwords)
-
-def authenticate(master_password, stored_key, stored_salt):
-    derived_key, _ = generate_key(master_password, stored_salt)
-    return derived_key == stored_key
-
-def get_key(master_password):
-    if keyring.get_password("password_manager", "master_key"):
-        stored_key = base64.urlsafe_b64decode(keyring.get_password("password_manager", "master_key"))
-        stored_salt = base64.b64decode(keyring.get_password("password_manager", "master_salt"))
-        if authenticate(master_password, stored_key, stored_salt):
-            key, _ = generate_key(master_password, stored_salt)
-            return key
-        else:
-            return None
-    else:
-        key, salt = generate_key(master_password)
-        keyring.set_password("password_manager", "master_key", base64.urlsafe_b64encode(key).decode())
-        keyring.set_password("password_manager", "master_salt", base64.b64decode(salt).decode())
-        return key
-
-def add_password_window(root, key):
-    add_window = tk.Toplevel(root)
-    add_window.title("Thêm mật khẩu")
-
-    tk.Label(add_window, text="Trang web/ứng dụng:").grid(row=0, column=0, padx=5, pady=5)
-    website_entry = tk.Entry(add_window)
-    website_entry.grid(row=0, column=1, padx=5, pady=5)
-
-    tk.Label(add_window, text="Tên người dùng:").grid(row=1, column=0, padx=5, pady=5)
-    username_entry = tk.Entry(add_window)
-    username_entry.grid(row=1, column=1, padx=5, pady=5)
-
-    tk.Label(add_window, text="Mật khẩu:").grid(row=2, column=0, padx=5, pady=5)
-    password_entry = tk.Entry(add_window, show="*")
-    password_entry.grid(row=2, column=1, padx=5, pady=5)
-
-    def add_password_action():
-        website = website_entry.get()
-        username = username_entry.get()
-        password = password_entry.get()
-        add_password(website, username, password, key)
-        messagebox.showinfo("Thông báo", "Mật khẩu đã được thêm.")
-        add_window.destroy()
-
-    ttk.Button(add_window, text="Thêm", command=add_password_action).grid(row=3, column=1, padx=5, pady=5)
-
-def view_passwords_window(root, key):
-    view_window = tk.Toplevel(root)
-    view_window.title("Xem mật khẩu")
-
-    password_list = view_passwords(key)
-    if not password_list:
-        tk.Label(view_window, text="Chưa có mật khẩu nào được lưu.", padx=10, pady=10).pack()
-    else:
-        tree = ttk.Treeview(view_window, columns=("website", "username", "password"), show="headings")
-        tree.heading("website", text="Trang web")
-        tree.heading("username", text="Người dùng")
-        tree.heading("password", text="Mật khẩu")
-        tree.pack(fill="both", expand=True, padx=5, pady=5)
-
-        for website, username, password in password_list:
-            tree.insert("", tk.END, values=(website, username, password))
-
-    ttk.Button(view_window, text="Đóng", command=view_window.destroy, padx=10, pady=5).pack()
-
-def edit_password_window(root, key):
-    edit_window = tk.Toplevel(root)
-    edit_window.title("Sửa mật khẩu")
-
-    tk.Label(edit_window, text="Trang web/ứng dụng:").grid(row=0, column=0, padx=5, pady=5)
-    website_entry = tk.Entry(edit_window)
-    website_entry.grid(row=0, column=1, padx=5, pady=5)
-
-    tk.Label(edit_window, text="Tên người dùng mới (để trống để giữ nguyên):").grid(row=1, column=0, padx=5, pady=5)
-    username_entry = tk.Entry(edit_window)
-    username_entry.grid(row=1, column=1, padx=5, pady=5)
-
-    tk.Label(edit_window, text="Mật khẩu mới:").grid(row=2, column=0, padx=5, pady=5)
-    password_entry = tk.Entry(edit_window, show="*")
-    password_entry.grid(row=2, column=1, padx=5, pady=5)
-
-    def edit_password_action():
-        website = website_entry.get()
-        new_username = username_entry.get()
-        new_password = password_entry.get()
-        edit_password(website, new_username, new_password, key)
-        messagebox.showinfo("Thông báo", "Mật khẩu đã được sửa.")
-        edit_window.destroy()
-
-    ttk.Button(edit_window, text="Sửa", command=edit_password_action).grid(row=3, column=1, padx=5, pady=5)
-
-def delete_password_window(root):
-    delete_window = tk.Toplevel(root)
-    delete_window.title("Xóa mật khẩu")
-
-    tk.Label(delete_window, text="Trang web/ứng dụng:").grid(row=0, column=0, padx=5, pady=5)
-    website_entry = tk.Entry(delete_window)
-    website_entry.grid(row=0, column=1, padx=5, pady=5)
-
-    def delete_password_action():
-        website = website_entry.get()
-        delete_password(website)
-        messagebox.showinfo("Thông báo", "Mật khẩu đã được xóa.")
-        delete_window.destroy()
-
-    ttk.Button(delete_window, text="Xóa", command=delete_password_action).grid(row=1, column=1, padx=5, pady=5)
-
-def main():
-    root = tk.Tk()
-    root.title("Quản lý mật khẩu")
-    root.geometry("400x300")
-
-    style = ttk.Style()
-    style.configure("TButton", padding=10, font=("Arial", 12))
-
-    master_password = getpass.getpass("Nhập mật khẩu chính: ")
-    key = get_key(master_password)
-    if key is None:
-        messagebox.showerror("Lỗi", "Mật khẩu chính không đúng.")
-        return
-
-    ttk.Button(root, text="Thêm mật khẩu", command=lambda: add_password_window(root, key)).pack(fill="x", pady=5)
-    ttk.Button(root, text="Xem mật khẩu", command=lambda: view_passwords_window(root, key)).pack(fill="x", pady=5)
-    ttk.Button(root, text="Sửa mật khẩu", command=lambda: edit_password_window(root, key)).pack(fill="x", pady=5)
-    ttk.Button(root, text="Xóa mật khẩu", command=lambda: delete_password_window(root)).pack(fill="x", pady=5)
-    ttk.Button(root, text="Thoát", command=root.destroy).pack(fill="x", pady=5)
-
+    ttk.Button(root, text="Thêm mật khẩu", command=lambda: add_password_window(root, key), style="TButton").pack(fill="x", pady=6)
+    ttk.Button(root, text="Xem mật khẩu", command=lambda: view_passwords_window(root, key), style="TButton").pack(fill="x", pady=6)
+    ttk.Button(root, text="Sửa mật khẩu", command=lambda: edit_password_window(root, key), style="TButton").pack(fill="x", pady=6)
+    ttk.Button(root, text="Xóa mật khẩu", command=lambda: delete_password_window(root), style="TButton").pack(fill="x", pady=6)
+    ttk.Button(root, text="Thoát", command=root.destroy, style="Red.TButton").pack(fill="x", pady=6)
+    ttk.Button(root, text="Xóa dữ liệu", command=delete_data).pack(fill="x", pady=6)
     root.mainloop()
 
 if __name__ == "__main__":
