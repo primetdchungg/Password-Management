@@ -1,0 +1,155 @@
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+import base64
+import os
+import json
+import getpass
+import keyring
+
+def generate_key(master_password, salt=None):
+    if salt is None:
+        salt = os.urandom(16)
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+    )
+    key = base64.urlsafe_b64encode(kdf.derive(master_password.encode()))
+    return key, salt
+
+def encrypt_data(data, key):
+    f = Fernet(key)
+    encrypted_data = f.encrypt(data.encode())
+    return encrypted_data.decode()
+
+def decrypt_data(encrypted_data, key):
+    try:
+        f = Fernet(key)
+        decrypted_data = f.decrypt(encrypted_data.encode()).decode()
+        return decrypted_data
+    except Exception as e:
+        print(f"Lỗi giải mã: {e}")
+        return None
+
+def load_passwords(filepath="passwords.json"):
+    if os.path.exists(filepath):
+        with open(filepath, "r") as f:
+            try:
+                data = json.load(f)
+                return data
+            except json.JSONDecodeError:
+                print("Lỗi: Tệp passwords.json bị hỏng.")
+                return {}
+    else:
+        return {}
+
+def save_passwords(passwords, filepath="passwords.json"):
+    with open(filepath, "w") as f:
+        json.dump(passwords, f)
+
+def add_password(passwords, key):
+    website = input("Nhập tên trang web/ứng dụng: ")
+    username = input("Nhập tên người dùng (tùy chọn): ")
+    password = input("Nhập mật khẩu: ")
+
+    encrypted_username = encrypt_data(username, key)
+    encrypted_password = encrypt_data(password, key)
+
+    data = {"username": encrypted_username, "password": encrypted_password}
+    passwords[website] = json.dumps(data)
+    return passwords
+
+def view_passwords(passwords, key):
+    if not passwords:
+        print("Chưa có mật khẩu nào được lưu.")
+        return
+    for website, encrypted_data in passwords.items():
+        try:
+            data = json.loads(encrypted_data)
+            username = decrypt_data(data["username"], key)
+            password = decrypt_data(data["password"], key)
+            if username and password:
+                print(f"Trang web: {website}, Người dùng: {username}, Mật khẩu: {password}")
+            else:
+                print(f"Lỗi: Không thể giải mã mật khẩu cho {website}.")
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Lỗi: Dữ liệu mật khẩu cho {website} bị hỏng ({e}).")
+
+def edit_password(passwords, key):
+    website = input("Nhập tên trang web/ứng dụng cần chỉnh sửa: ")
+    if website not in passwords:
+        print("Không tìm thấy trang web/ứng dụng.")
+        return
+    username = input("Nhập tên người dùng mới (để trống để giữ nguyên): ")
+    password = input("Nhập mật khẩu mới: ")
+
+    encrypted_username = encrypt_data(username, key)
+    encrypted_password = encrypt_data(password, key)
+
+    data = {"username": encrypted_username, "password": encrypted_password}
+    passwords[website] = json.dumps(data)
+    return passwords
+
+def delete_password(passwords):
+    website = input("Nhập tên trang web/ứng dụng cần xóa: ")
+    if website not in passwords:
+        print("Không tìm thấy trang web/ứng dụng.")
+        return
+    del passwords[website]
+    return passwords
+
+def authenticate(master_password, stored_key, stored_salt):
+    derived_key, _ = generate_key(master_password, stored_salt)
+    return derived_key == stored_key
+
+def get_key(master_password):
+    if keyring.get_password("password_manager", "master_key"):
+        stored_key = base64.urlsafe_b64decode(keyring.get_password("password_manager", "master_key"))
+        stored_salt = base64.b64decode(keyring.get_password("password_manager", "master_salt"))
+        if authenticate(master_password, stored_key, stored_salt):
+            key, _ = generate_key(master_password, stored_salt)
+            return key
+        else:
+            return None
+    else:
+        key, salt = generate_key(master_password)
+        keyring.set_password("password_manager", "master_key", base64.urlsafe_b64encode(key).decode())
+        keyring.set_password("password_manager", "master_salt", base64.b64decode(salt).decode())
+        return key
+
+def main():
+    filepath = "passwords.json"
+    master_password = getpass.getpass("Nhập mật khẩu chính: ")
+    key = get_key(master_password)
+    if key is None:
+        print("Mật khẩu chính không đúng.")
+        return
+
+    passwords = load_passwords(filepath)
+
+    while True:
+        print("\nChọn thao tác:")
+        print("1. Thêm mật khẩu")
+        print("2. Xem mật khẩu")
+        print("3. Sửa mật khẩu")
+        print("4. Xóa mật khẩu")
+        print("5. Thoát")
+        choice = input("Nhập lựa chọn: ")
+        if choice == "1":
+            passwords = add_password(passwords, key)
+        elif choice == "2":
+            view_passwords(passwords, key)
+        elif choice == "3":
+            passwords = edit_password(passwords, key)
+        elif choice == "4":
+            passwords = delete_password(passwords)
+        elif choice == "5":
+            break
+        else:
+            print("Lựa chọn không hợp lệ.")
+        save_passwords(passwords, filepath)
+
+if __name__ == "__main__":
+    main()
